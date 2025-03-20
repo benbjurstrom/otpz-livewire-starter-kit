@@ -1,12 +1,19 @@
 <?php
 
 use App\Http\Controllers\Auth\VerifyEmailController;
+use BenBjurstrom\Otpz\Http\Controllers\PostOtpController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Route::middleware('guest')->group(function () {
     Volt::route('login', 'auth.login')
         ->name('login');
+
+    Volt::route('otpz/{id}', 'auth.otpz')
+        ->name('otpz.show');
+
+    Route::post('otpz/{id}', PostOtpController::class)
+        ->name('otpz.post');
 
     Volt::route('register', 'auth.register')
         ->name('register');

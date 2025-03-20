@@ -3,44 +3,43 @@
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
+use BenBjurstrom\Otpz\Actions\SendOtp;
+use BenBjurstrom\Otpz\Exceptions\OtpThrottleException;
+use BenBjurstrom\Otpz\Models\Otp;
 
 new #[Layout('components.layouts.auth')] class extends Component {
     #[Validate('required|string|email')]
     public string $email = '';
-
-    #[Validate('required|string')]
-    public string $password = '';
 
     public bool $remember = false;
 
     /**
      * Handle an incoming authentication request.
      */
-    public function login(): void
+    public function sendEmail(): void
     {
         $this->validate();
 
         $this->ensureIsNotRateLimited();
+        RateLimiter::hit($this->throttleKey(), 300);
 
-        if (! Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
-            RateLimiter::hit($this->throttleKey());
-
+        try {
+            $otp = (new SendOtp)->handle($this->email, $this->remember);
+        } catch (OtpThrottleException $e) {
             throw ValidationException::withMessages([
-                'email' => __('auth.failed'),
+                'form.email' => $e->getMessage(),
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
-        Session::regenerate();
 
-        $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
+        $this->redirect($otp->url);
     }
 
     /**
@@ -74,53 +73,32 @@ new #[Layout('components.layouts.auth')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-6">
-    <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
+    <x-auth-header title="Sign-in with email" description="Request a one time login code below." />
 
     <!-- Session Status -->
     <x-auth-session-status class="text-center" :status="session('status')" />
 
-    <form wire:submit="login" class="flex flex-col gap-6">
+    <form wire:submit="sendEmail" class="flex flex-col gap-6">
         <!-- Email Address -->
         <flux:input
             wire:model="email"
-            :label="__('Email address')"
+            label="{{ __('Email address') }}"
             type="email"
+            name="email"
             required
             autofocus
             autocomplete="email"
             placeholder="email@example.com"
         />
 
-        <!-- Password -->
-        <div class="relative">
-            <flux:input
-                wire:model="password"
-                :label="__('Password')"
-                type="password"
-                required
-                autocomplete="current-password"
-                :placeholder="__('Password')"
-            />
-
-            @if (Route::has('password.request'))
-                <flux:link class="absolute right-0 top-0 text-sm" :href="route('password.request')" wire:navigate>
-                    {{ __('Forgot your password?') }}
-                </flux:link>
-            @endif
-        </div>
-
         <!-- Remember Me -->
-        <flux:checkbox wire:model="remember" :label="__('Remember me')" />
+        <flux:checkbox wire:model="remember" label="{{ __('Remember me') }}" />
 
         <div class="flex items-center justify-end">
-            <flux:button variant="primary" type="submit" class="w-full">{{ __('Log in') }}</flux:button>
+            <flux:button variant="primary" type="submit" class="w-full">{{ __('Send Code') }}</flux:button>
         </div>
     </form>
-
-    @if (Route::has('register'))
-        <div class="space-x-1 text-center text-sm text-zinc-600 dark:text-zinc-400">
-            {{ __('Don\'t have an account?') }}
-            <flux:link :href="route('register')" wire:navigate>{{ __('Sign up') }}</flux:link>
-        </div>
-    @endif
+    <div class="space-x-1 text-center text-sm text-zinc-600 dark:text-zinc-400">
+        If you don't have an account one will be created for you.
+    </div>
 </div>

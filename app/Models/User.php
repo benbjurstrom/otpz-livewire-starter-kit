@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use BenBjurstrom\Otpz\Models\Concerns\HasOtps;
+use BenBjurstrom\Otpz\Models\Concerns\Otpable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements Otpable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasOtps;
 
     /**
      * The attributes that are mass assignable.
